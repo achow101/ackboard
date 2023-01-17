@@ -1,6 +1,12 @@
-# ACK Board
+# ACKBoard
 
 A curses dashboard for ACKs.
+
+## Github Token
+
+ACKBoard requires a GitHub token in order to use the GraphQL API.
+See the [GitHub Docs](https://docs.github.com/en/graphql/guides/forming-calls-with-graphql#authenticating-with-a-personal-access-token-classic) for how to get a token.
+The token should be put in a text file whose path will be given as a CLI arg.
 
 ## Usage
 
