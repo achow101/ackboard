@@ -374,7 +374,7 @@ def detailed_pr_info(pad: curses.window, pr_num: int, pr_info: PrInfo) -> None:
             show_top = 0
         elif key == ord("G"):
             show_top = max(len(text_lines) - lines, 0)
-        elif key == ord("b"):
+        elif key == ord("o"):
             webbrowser.open(pr_info.url)
 
 
@@ -539,7 +539,7 @@ def main(stdscr: curses.window) -> None:
             pr_idx = cursor_pos - 1 + show_top
             pr_num, pr_info = sorted_pr_infos[pr_idx]
             detailed_pr_info(pad, pr_num, pr_info)
-        elif key == ord("b"):
+        elif key == ord("o"):
             pr_idx = cursor_pos - 1 + show_top
             pr_num, pr_info = sorted_pr_infos[pr_idx]
             webbrowser.open(pr_info.url)
