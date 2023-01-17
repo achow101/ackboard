@@ -31,9 +31,15 @@ headers = {
     "accept": "application/vnd.github.v3+json",
 }
 
+repo_vars = {
+    "repo_name": "",
+    "repo_owner": "",
+}
+
+
 prs_query = """
-query($prs_cursor: String) {
-  repository(name: "bitcoin", owner: "bitcoin") {
+query($prs_cursor: String, $repo_owner: String!, $repo_name: String!) {
+  repository(name: $repo_name, owner: $repo_owner) {
     pullRequests(states: [OPEN], first: 100, after: $prs_cursor) {
       nodes {
         number
@@ -89,8 +95,8 @@ query($prs_cursor: String) {
 """
 
 comments_query = """
-    query($comments_cursor: String, $pr_num: Int!) {
-      repository(name: "bitcoin", owner: "bitcoin") {
+    query($comments_cursor: String, $pr_num: Int!, $repo_owner: String!, $repo_name: String!) {
+      repository(name: $repo_name, owner: $repo_owner) {
         pullRequest(number: $pr_num) {
           comments(first: 100, after: $comments_cursor) {
             nodes {
@@ -112,8 +118,8 @@ comments_query = """
 """
 
 reviews_query = """
-    query($reviews_cursor: String, $pr_num: Int!) {
-      repository(name: "bitcoin", owner: "bitcoin") {
+    query($reviews_cursor: String, $pr_num: Int!, $repo_owner: String!, $repo_name: String!) {
+      repository(name: $repo_name, owner: $repo_owner) {
         pullRequest(number: $pr_num) {
           reviews(first: 100, after: $reviews_cursor) {
             nodes {
@@ -158,7 +164,7 @@ def extract_acks(user: str, text: str, acks: Acks, head_abbrev: str) -> None:
 
 def get_pr_infos() -> Dict[int, PrInfo]:
     pr_infos: Dict[int, PrInfo] = {}
-    pr_query_vars: Dict[str, str] = {}
+    pr_query_vars: Dict[str, str] = repo_vars.copy()
     while True:
         pr_res = requests.post(
             "https://api.github.com/graphql",
@@ -207,6 +213,7 @@ def get_pr_infos() -> Dict[int, PrInfo]:
                     "comments_cursor": comments_page_info["endCursor"],
                     "pr_num": number,
                 }
+                comments_query_vars.update(repo_vars)
                 comments_res = requests.post(
                     "https://api.github.com/graphql",
                     json={"query": comments_query, "variables": comments_query_vars},
@@ -245,6 +252,7 @@ def get_pr_infos() -> Dict[int, PrInfo]:
                     "reviews_cursor": reviews_page_info["endCursor"],
                     "pr_num": number,
                 }
+                reviews_query_vars.update(repo_vars)
                 reviews_res = requests.post(
                     "https://api.github.com/graphql",
                     json={"query": reviews_query, "variables": reviews_query_vars},
@@ -591,8 +599,15 @@ def main(stdscr: curses.window) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--token-file", help="Path to the file containing the GitHub token")
+    parser.add_argument(
+        "-t", "--token-file", help="Path to the file containing the GitHub token"
+    )
+    parser.add_argument("repo_owner", help="Repository owner")
+    parser.add_argument("repo_name", help="Repository name")
     args = parser.parse_args()
+
+    repo_vars["repo_owner"] = args.repo_owner
+    repo_vars["repo_name"] = args.repo_name
 
     if args.token_file:
         with open(args.token_file, "r") as f:
