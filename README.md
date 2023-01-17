@@ -7,16 +7,15 @@ A curses dashboard for ACKs.
 ### Command line arguments
 
 ```
-usage: ackboard.py [-h] [-t TOKEN_FILE] repo_owner repo_name
+usage: ackboard.py [-h] token_file repo_owner repo_name
 
 positional arguments:
-  repo_owner            Repository owner
-  repo_name             Repository name
+  token_file  Path to the file containing the GitHub token
+  repo_owner  Repository owner
+  repo_name   Repository name
 
 options:
-  -h, --help            show this help message and exit
-  -t TOKEN_FILE, --token-file TOKEN_FILE
-                        Path to the file containing the GitHub token
+  -h, --help  show this help message and exit
 ```
 
 ### Main UI Keybinds

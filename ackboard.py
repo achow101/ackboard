@@ -600,7 +600,7 @@ def main(stdscr: curses.window) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-t", "--token-file", help="Path to the file containing the GitHub token"
+        "token_file", help="Path to the file containing the GitHub token"
     )
     parser.add_argument("repo_owner", help="Repository owner")
     parser.add_argument("repo_name", help="Repository name")
@@ -609,9 +609,8 @@ if __name__ == "__main__":
     repo_vars["repo_owner"] = args.repo_owner
     repo_vars["repo_name"] = args.repo_name
 
-    if args.token_file:
-        with open(args.token_file, "r") as f:
-            line = f.readline().strip()
-            headers["Authorization"] = line
+    with open(args.token_file, "r") as f:
+        line = f.readline().strip()
+        headers["Authorization"] = line
 
     curses.wrapper(main)
