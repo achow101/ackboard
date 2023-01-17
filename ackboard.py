@@ -5,6 +5,7 @@ import curses
 import functools
 import re
 import requests
+import webbrowser
 
 from dataclasses import dataclass
 from typing import (
@@ -25,6 +26,7 @@ class PrInfo:
     acks: Acks
     draft: bool
     needs_rebase: bool
+    url: str
 
 
 headers = {
@@ -46,6 +48,7 @@ query($prs_cursor: String, $repo_owner: String!, $repo_name: String!) {
         isDraft
         headRefOid
         title
+        url
         author {
             login
         }
@@ -278,6 +281,7 @@ def get_pr_infos() -> Dict[int, PrInfo]:
                 acks=acks,
                 draft=pr["isDraft"],
                 needs_rebase="Needs rebase" in labels,
+                url=pr["url"]
             )
 
         pr_query_vars["prs_cursor"] = pr_page_info["endCursor"]
@@ -370,6 +374,8 @@ def detailed_pr_info(pad: curses.window, pr_num: int, pr_info: PrInfo) -> None:
             show_top = 0
         elif key == ord("G"):
             show_top = max(len(text_lines) - lines, 0)
+        elif key == ord("b"):
+            webbrowser.open(pr_info.url)
 
 
 def apply_filter(
@@ -533,6 +539,10 @@ def main(stdscr: curses.window) -> None:
             pr_idx = cursor_pos - 1 + show_top
             pr_num, pr_info = sorted_pr_infos[pr_idx]
             detailed_pr_info(pad, pr_num, pr_info)
+        elif key == ord("b"):
+            pr_idx = cursor_pos - 1 + show_top
+            pr_num, pr_info = sorted_pr_infos[pr_idx]
+            webbrowser.open(pr_info.url)
         elif key == ord(":"):
             stdscr.move(lines - 1, 0)
             stdscr.addch(chr(key))
