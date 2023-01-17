@@ -5,7 +5,6 @@ import curses
 import functools
 import re
 import requests
-import yaml
 
 from dataclasses import dataclass
 from typing import (
@@ -592,14 +591,12 @@ def main(stdscr: curses.window) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--config", help="Config file")
+    parser.add_argument("-t", "--token-file", help="Path to the file containing the GitHub token")
     args = parser.parse_args()
 
-    if args.config:
-        with open(args.config, "r") as f:
-            config = yaml.safe_load(f)
-
-            if "github_token" in config:
-                headers["Authorization"] = config["github_token"]
+    if args.token_file:
+        with open(args.token_file, "r") as f:
+            line = f.readline().strip()
+            headers["Authorization"] = line
 
     curses.wrapper(main)
