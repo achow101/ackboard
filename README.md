@@ -43,6 +43,7 @@ options:
 | `:sc` | Sort by number of Concept ACKs |
 | `:f` | Apply a filter. See Filters for more info |
 | `:c` | Clear filters |
+| `b` | Open PR in browser |
 
 #### Filters
 
@@ -77,3 +78,4 @@ For example, the command `:fo/achow101` filters the listed PRs where the PR auth
 | Page Up | Show previous page of lines |
 | `g` | Go to top |
 | `G` | Go to bottom |
+| `b` | Open PR in browser |
