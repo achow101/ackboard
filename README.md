@@ -79,3 +79,12 @@ For example, the command `:fo/achow101` filters the listed PRs where the PR auth
 | `g` | Go to top |
 | `G` | Go to bottom |
 | `o` | Open PR in browser |
+
+### Colors
+
+Some lines are colored differently to indicate special statuses that may be important:
+
+| Color | Status |
+|-------|--------|
+| Blue | Draft PR |
+| Cyan | PR needs rebase |
