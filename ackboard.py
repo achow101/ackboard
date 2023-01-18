@@ -5,14 +5,15 @@ import curses
 import functools
 import re
 import requests
+import time
 import webbrowser
 
 from dataclasses import dataclass
 from typing import (
+    Any,
     Dict,
     List,
     Tuple,
-    Union,
 )
 
 Acks = Dict[str, Dict[str, str]]
@@ -170,6 +171,24 @@ def extract_acks(user: str, text: str, acks: Acks, head_abbrev: str) -> None:
                 return
 
 
+def graphql_request(query: str, variables: Dict[str, str]) -> Any:
+    while True:
+        res = requests.post(
+            "https://api.github.com/graphql",
+            json={"query": query, "variables": variables},
+            headers=headers,
+        )
+        if res.ok:
+            return res.json()
+        if res.status_code == 502:
+            # 502 is a server error, wait a bit and try again
+            time.sleep(10)
+            continue
+        raise Exception(
+            f"Result: {res}, Content: {res.content!r}, Headers: {res.headers}"
+        )
+
+
 def get_pr_infos(stdscr: curses.window) -> Dict[int, PrInfo]:
     pr_infos: Dict[int, PrInfo] = {}
     pr_query_vars: Dict[str, str] = repo_vars.copy()
@@ -180,16 +199,7 @@ def get_pr_infos(stdscr: curses.window) -> Dict[int, PrInfo]:
         )
         stdscr.refresh()
 
-        pr_res = requests.post(
-            "https://api.github.com/graphql",
-            json={"query": prs_query, "variables": pr_query_vars},
-            headers=headers,
-        )
-        if not pr_res.ok:
-            raise Exception(
-                f"Result: {pr_res}, Content: {pr_res.content!r}, Headers: {pr_res.headers}"
-            )
-        pr_query_res = pr_res.json()
+        pr_query_res = graphql_request(prs_query, pr_query_vars)
         pr_list = pr_query_res["data"]["repository"]["pullRequests"]["nodes"]
         pr_page_info = pr_query_res["data"]["repository"]["pullRequests"]["pageInfo"]
 
@@ -230,16 +240,9 @@ def get_pr_infos(stdscr: curses.window) -> Dict[int, PrInfo]:
                     "pr_num": number,
                 }
                 comments_query_vars.update(repo_vars)
-                comments_res = requests.post(
-                    "https://api.github.com/graphql",
-                    json={"query": comments_query, "variables": comments_query_vars},
-                    headers=headers,
+                comments_query_res = graphql_request(
+                    comments_query, comments_query_vars
                 )
-                if not comments_res.ok:
-                    raise Exception(
-                        f"Result: {comments_res}, Content: {comments_res.content!r}, Headers: {comments_res.headers}"
-                    )
-                comments_query_res = comments_res.json()
                 comments = comments_query_res["data"]["repository"]["pullRequest"][
                     "comments"
                 ]["nodes"]
@@ -270,16 +273,7 @@ def get_pr_infos(stdscr: curses.window) -> Dict[int, PrInfo]:
                     "pr_num": number,
                 }
                 reviews_query_vars.update(repo_vars)
-                reviews_res = requests.post(
-                    "https://api.github.com/graphql",
-                    json={"query": reviews_query, "variables": reviews_query_vars},
-                    headers=headers,
-                )
-                if not reviews_res.ok:
-                    raise Exception(
-                        f"Result: {reviews_res}, Content: {reviews_res.content!r}, Headers: {reviews_res.headers}"
-                    )
-                reviews_query_res = reviews_res.json()
+                reviews_query_res = graphql_request(reviews_query, reviews_query_vars)
                 reviews = reviews_query_res["data"]["repository"]["pullRequest"][
                     "reviews"
                 ]["nodes"]
