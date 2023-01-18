@@ -347,7 +347,7 @@ def detailed_pr_info(pad: curses.window, pr_num: int, pr_info: PrInfo) -> None:
         for acker, ack in acks.items():
             text_lines.append(f"  {acker}: {ack}")
 
-    max_width = max([len(l) for l in text_lines])
+    max_width = max([len(line) for line in text_lines])
     shift = 0
     show_top = 0
 
