@@ -170,10 +170,14 @@ def extract_acks(user: str, text: str, acks: Acks, head_abbrev: str) -> None:
                 return
 
 
-def get_pr_infos() -> Dict[int, PrInfo]:
+def get_pr_infos(stdscr: curses.window) -> Dict[int, PrInfo]:
     pr_infos: Dict[int, PrInfo] = {}
     pr_query_vars: Dict[str, str] = repo_vars.copy()
     while True:
+        stdscr.clear()
+        stdscr.addstr(f"Fetching PRs from GitHub, this may take a while... ({len(pr_infos)} PRs loaded)")
+        stdscr.refresh()
+
         pr_res = requests.post(
             "https://api.github.com/graphql",
             json={"query": prs_query, "variables": pr_query_vars},
@@ -421,7 +425,7 @@ def apply_filter(
 
 def main(stdscr: curses.window) -> None:
 
-    pr_infos = get_pr_infos()
+    pr_infos = get_pr_infos(stdscr)
     sort_key = "ACKs"
     sorted_pr_infos = sorted(
         pr_infos.items(), key=functools.partial(ack_key_func, sort_key), reverse=True
@@ -562,12 +566,7 @@ def main(stdscr: curses.window) -> None:
             if cmd == "q":
                 break
             elif cmd == "r":
-                stdscr.clear()
-                stdscr.addstr(0, 0, "Refreshing")
-                stdscr.move(0, 0)
-                stdscr.refresh()
-
-                pr_infos = get_pr_infos()
+                pr_infos = get_pr_infos(stdscr)
                 sorted_pr_infos = sorted(
                     pr_infos.items(),
                     key=functools.partial(ack_key_func, sort_key),
