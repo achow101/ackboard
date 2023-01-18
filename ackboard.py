@@ -175,7 +175,9 @@ def get_pr_infos(stdscr: curses.window) -> Dict[int, PrInfo]:
     pr_query_vars: Dict[str, str] = repo_vars.copy()
     while True:
         stdscr.clear()
-        stdscr.addstr(f"Fetching PRs from GitHub, this may take a while... ({len(pr_infos)} PRs loaded)")
+        stdscr.addstr(
+            f"Fetching PRs from GitHub, this may take a while... ({len(pr_infos)} PRs loaded)"
+        )
         stdscr.refresh()
 
         pr_res = requests.post(
@@ -293,7 +295,7 @@ def get_pr_infos(stdscr: curses.window) -> Dict[int, PrInfo]:
                 acks=acks,
                 draft=pr["isDraft"],
                 needs_rebase="Needs rebase" in labels,
-                url=pr["url"]
+                url=pr["url"],
             )
 
         pr_query_vars["prs_cursor"] = pr_page_info["endCursor"]
