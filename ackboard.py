@@ -158,6 +158,11 @@ def extract_acks(user: str, text: str, acks: Acks, head_abbrev: str) -> None:
             match = pattern.search(line)
             if match:
                 groups = match.groups()
+
+                # Remove any previous acks from this user
+                for _, existing_acks in acks.items():
+                    existing_acks.pop(user, None)
+
                 if len(groups) > 1 and groups[1][0:6] != head_abbrev:
                     acks["Stale ACKs"][user] = line
                 else:
