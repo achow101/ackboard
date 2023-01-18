@@ -597,6 +597,7 @@ def main(stdscr: curses.window) -> None:
                 filter_regex = cmd.split("/")[1]
                 sorted_pr_infos = apply_filter(sorted_pr_infos, filter_regex, apply_to)
                 cursor_pos = 1
+                show_top = 0
                 stdscr.move(1, 0)
                 stdscr.clrtobot()
             elif cmd == "c":
