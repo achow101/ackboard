@@ -199,6 +199,7 @@ def get_pr_infos() -> Dict[int, PrInfo]:
             number = pr["number"]
             head_commit = pr["headRefOid"]
             head_abbrev = head_commit[0:6]
+            author = pr["author"]["login"]
 
             # Process comments, paginating as needed
             comments = pr["comments"]["nodes"]
@@ -208,6 +209,7 @@ def get_pr_infos() -> Dict[int, PrInfo]:
                     if (
                         comment["author"] is None
                         or comment["author"]["login"] == "DrahtBot"
+                        or comment["author"]["login"] == author
                     ):
                         continue
                     extract_acks(
@@ -247,6 +249,7 @@ def get_pr_infos() -> Dict[int, PrInfo]:
                     if (
                         review["author"] is None
                         or review["author"]["login"] == "DrahtBot"
+                        or review["author"]["login"] == author
                     ):
                         continue
                     extract_acks(
@@ -282,7 +285,7 @@ def get_pr_infos() -> Dict[int, PrInfo]:
             pr_infos[number] = PrInfo(
                 title=pr["title"],
                 labels=labels,
-                author=pr["author"]["login"],
+                author=author,
                 acks=acks,
                 draft=pr["isDraft"],
                 needs_rebase="Needs rebase" in labels,
