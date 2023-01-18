@@ -621,6 +621,9 @@ if __name__ == "__main__":
 
     with open(args.token_file, "r") as f:
         line = f.readline().strip()
-        headers["Authorization"] = "bearer " + line
+        if line.lower().startswith("bearer "):
+            headers["Authorization"] = line
+        else:
+            headers["Authorization"] = "bearer " + line
 
     curses.wrapper(main)
