@@ -53,26 +53,20 @@ query($prs_cursor: String, $repo_owner: String!, $repo_name: String!) {
         author {
             login
         }
-        comments(first: 100) {
+        timelineItems(first: 100, itemTypes: [ISSUE_COMMENT, PULL_REQUEST_REVIEW]) {
           nodes {
-            author {
-              login
+            ... on IssueComment{
+              author {
+                login
+              }
+              body
             }
-            body
-          }
-          pageInfo {
-            endCursor
-            hasNextPage
-            hasPreviousPage
-            startCursor
-          }
-        }
-        reviews(first: 100) {
-          nodes {
-            author {
-              login
+            ... on PullRequestReview{
+              author {
+                login
+              }
+              body
             }
-            body
           }
           pageInfo {
             endCursor
@@ -102,35 +96,20 @@ comments_query = """
     query($comments_cursor: String, $pr_num: Int!, $repo_owner: String!, $repo_name: String!) {
       repository(name: $repo_name, owner: $repo_owner) {
         pullRequest(number: $pr_num) {
-          comments(first: 100, after: $comments_cursor) {
+          timelineItems(first: 100, after: $comments_cursor, itemTypes: [ISSUE_COMMENT, PULL_REQUEST_REVIEW]) {
             nodes {
-              author {
-                login
+              ... on IssueComment{
+                author {
+                  login
+                }
+                body
               }
-              body
-            }
-            pageInfo {
-              endCursor
-              hasNextPage
-              hasPreviousPage
-              startCursor
-            }
-          }
-        }
-      }
-    }
-"""
-
-reviews_query = """
-    query($reviews_cursor: String, $pr_num: Int!, $repo_owner: String!, $repo_name: String!) {
-      repository(name: $repo_name, owner: $repo_owner) {
-        pullRequest(number: $pr_num) {
-          reviews(first: 100, after: $reviews_cursor) {
-            nodes {
-              author {
-                login
+              ... on PullRequestReview{
+                author {
+                  login
+                }
+                body
               }
-              body
             }
             pageInfo {
               endCursor
@@ -217,9 +196,9 @@ def get_pr_infos(stdscr: curses.window) -> Dict[int, PrInfo]:
             head_abbrev = head_commit[0:6]
             author = pr["author"]["login"]
 
-            # Process comments, paginating as needed
-            comments = pr["comments"]["nodes"]
-            comments_page_info = pr["comments"]["pageInfo"]
+            # Process comments and reviews, paginating as needed
+            comments = pr["timelineItems"]["nodes"]
+            comments_page_info = pr["timelineItems"]["pageInfo"]
             while True:
                 for comment in comments:
                     if (
@@ -244,42 +223,11 @@ def get_pr_infos(stdscr: curses.window) -> Dict[int, PrInfo]:
                     comments_query, comments_query_vars
                 )
                 comments = comments_query_res["data"]["repository"]["pullRequest"][
-                    "comments"
+                    "timelineItems"
                 ]["nodes"]
                 comments_page_info = comments_query_res["data"]["repository"][
                     "pullRequest"
-                ]["comments"]["pageInfo"]
-
-            # Process reviews, paginating as needed
-            reviews = pr["reviews"]["nodes"]
-            reviews_page_info = pr["reviews"]["pageInfo"]
-            while True:
-                for review in reviews:
-                    if (
-                        review["author"] is None
-                        or review["author"]["login"] == "DrahtBot"
-                        or review["author"]["login"] == author
-                    ):
-                        continue
-                    extract_acks(
-                        review["author"]["login"], review["body"], acks, head_abbrev
-                    )
-
-                if not reviews_page_info["hasNextPage"]:
-                    break
-
-                reviews_query_vars = {
-                    "reviews_cursor": reviews_page_info["endCursor"],
-                    "pr_num": number,
-                }
-                reviews_query_vars.update(repo_vars)
-                reviews_query_res = graphql_request(reviews_query, reviews_query_vars)
-                reviews = reviews_query_res["data"]["repository"]["pullRequest"][
-                    "reviews"
-                ]["nodes"]
-                reviews_page_info = reviews_query_res["data"]["repository"][
-                    "pullRequest"
-                ]["reviews"]["pageInfo"]
+                ]["timelineItems"]["pageInfo"]
 
             labels = [n["name"] for n in pr["labels"]["nodes"]]
             pr_infos[number] = PrInfo(
