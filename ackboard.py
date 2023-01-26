@@ -21,6 +21,7 @@ Acks = Dict[str, Dict[str, str]]
 
 @dataclass
 class PrInfo:
+    number: int
     title: str
     labels: List[str]
     author: str
@@ -168,8 +169,8 @@ def graphql_request(query: str, variables: Dict[str, str]) -> Any:
         )
 
 
-def get_pr_infos(stdscr: curses.window) -> Dict[int, PrInfo]:
-    pr_infos: Dict[int, PrInfo] = {}
+def get_pr_infos(stdscr: curses.window) -> List[PrInfo]:
+    pr_infos: List[PrInfo] = []
     pr_query_vars: Dict[str, str] = repo_vars.copy()
     while True:
         stdscr.clear()
@@ -230,14 +231,17 @@ def get_pr_infos(stdscr: curses.window) -> Dict[int, PrInfo]:
                 ]["timelineItems"]["pageInfo"]
 
             labels = [n["name"] for n in pr["labels"]["nodes"]]
-            pr_infos[number] = PrInfo(
-                title=pr["title"],
-                labels=labels,
-                author=author,
-                acks=acks,
-                draft=pr["isDraft"],
-                needs_rebase="Needs rebase" in labels,
-                url=pr["url"],
+            pr_infos.append(
+                PrInfo(
+                    number=number,
+                    title=pr["title"],
+                    labels=labels,
+                    author=author,
+                    acks=acks,
+                    draft=pr["isDraft"],
+                    needs_rebase="Needs rebase" in labels,
+                    url=pr["url"],
+                )
             )
 
         pr_query_vars["prs_cursor"] = pr_page_info["endCursor"]
@@ -247,10 +251,7 @@ def get_pr_infos(stdscr: curses.window) -> Dict[int, PrInfo]:
 
 
 # Key function. Returns tuple containing (num acks, num stale acks, num nacks, num approch acks, num concept acks, num other acks)
-def ack_key_func(
-    primary_sort_key: str, pr_info_item: Tuple[int, PrInfo]
-) -> Tuple[int, int, int, int]:
-    _, info = pr_info_item
+def ack_key_func(primary_sort_key: str, info: PrInfo) -> Tuple[int, int, int, int]:
     acks = info.acks
     order = [
         "ACKs",
@@ -275,7 +276,7 @@ def str_to_width(item: str, width: int, padding: int = 4, ellipsis: str = "…")
     return f"{item_str:{width}}"
 
 
-def detailed_pr_info(pad: curses.window, pr_num: int, pr_info: PrInfo) -> None:
+def detailed_pr_info(pad: curses.window, pr_info: PrInfo) -> None:
     lines, cols = pad.getmaxyx()
     lines -= 2
     cols -= 2
@@ -285,7 +286,7 @@ def detailed_pr_info(pad: curses.window, pr_num: int, pr_info: PrInfo) -> None:
     if pr_info.draft:
         text_lines.append("Draft PR")
 
-    text_lines.append(f"Number: {pr_num}")
+    text_lines.append(f"Number: {pr_info.number}")
     text_lines.append(f"Title: {pr_info.title}")
     text_lines.append(f"Author: {pr_info.author}")
     text_lines.append(f"Labels: {', '.join(pr_info.labels)}")
@@ -335,14 +336,14 @@ def detailed_pr_info(pad: curses.window, pr_num: int, pr_info: PrInfo) -> None:
 
 
 def apply_filter(
-    sorted_pr_infos: List[Tuple[int, PrInfo]], filter_regex: str, apply_to: str
-) -> List[Tuple[int, PrInfo]]:
+    sorted_pr_infos: List[PrInfo], filter_regex: str, apply_to: str
+) -> List[PrInfo]:
     pr_filter = re.compile(filter_regex.lower())
     out = []
-    for pr_num, pr_info in sorted_pr_infos:
+    for pr_info in sorted_pr_infos:
         to_search = []
         if apply_to == "p":
-            to_search.append(str(pr_num))
+            to_search.append(str(pr_info.number))
         elif apply_to == "t":
             to_search.append(pr_info.title)
         elif apply_to == "o":
@@ -361,7 +362,7 @@ def apply_filter(
         for s in to_search:
             match = pr_filter.search(s.lower())
             if match:
-                out.append((pr_num, pr_info))
+                out.append(pr_info)
                 break
 
     return out
@@ -372,7 +373,7 @@ def main(stdscr: curses.window) -> None:
     pr_infos = get_pr_infos(stdscr)
     sort_key = "ACKs"
     sorted_pr_infos = sorted(
-        pr_infos.items(), key=functools.partial(ack_key_func, sort_key), reverse=True
+        pr_infos, key=functools.partial(ack_key_func, sort_key), reverse=True
     )
 
     stdscr.clear()
@@ -419,7 +420,7 @@ def main(stdscr: curses.window) -> None:
             if pr_i >= len(sorted_pr_infos):
                 break
 
-            pr_num, pr_info = sorted_pr_infos[pr_i]
+            pr_info = sorted_pr_infos[pr_i]
 
             attrs = 0
             if line_pos == cursor_pos:
@@ -429,7 +430,7 @@ def main(stdscr: curses.window) -> None:
             elif pr_info.needs_rebase:
                 attrs |= curses.color_pair(2)
 
-            pr_num_str = str_to_width(str(pr_num), pr_num_cols)
+            pr_num_str = str_to_width(str(pr_info.number), pr_num_cols)
             title_str = str_to_width(pr_info.title, title_cols)
             author_str = str_to_width(pr_info.author, author_cols)
             labels_str = str_to_width(", ".join(pr_info.labels), labels_cols)
@@ -493,11 +494,11 @@ def main(stdscr: curses.window) -> None:
         elif key == ord("d"):
             pad = stdscr.subpad(20, 120, 15, 20)
             pr_idx = cursor_pos - 1 + show_top
-            pr_num, pr_info = sorted_pr_infos[pr_idx]
-            detailed_pr_info(pad, pr_num, pr_info)
+            pr_info = sorted_pr_infos[pr_idx]
+            detailed_pr_info(pad, pr_info)
         elif key == ord("o"):
             pr_idx = cursor_pos - 1 + show_top
-            pr_num, pr_info = sorted_pr_infos[pr_idx]
+            pr_info = sorted_pr_infos[pr_idx]
             webbrowser.open(pr_info.url)
         elif key == ord(":"):
             stdscr.move(lines - 1, 0)
@@ -512,7 +513,7 @@ def main(stdscr: curses.window) -> None:
             elif cmd == "r":
                 pr_infos = get_pr_infos(stdscr)
                 sorted_pr_infos = sorted(
-                    pr_infos.items(),
+                    pr_infos,
                     key=functools.partial(ack_key_func, sort_key),
                     reverse=True,
                 )
@@ -550,7 +551,7 @@ def main(stdscr: curses.window) -> None:
                 stdscr.clrtobot()
             elif cmd == "c":
                 sorted_pr_infos = sorted(
-                    pr_infos.items(),
+                    pr_infos,
                     key=functools.partial(ack_key_func, sort_key),
                     reverse=True,
                 )
