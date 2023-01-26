@@ -31,6 +31,12 @@ class PrInfo:
     url: str
 
 
+@dataclass
+class Filter:
+    regex: str = ""
+    apply: str = ""
+
+
 headers = {
     "accept": "application/vnd.github.v3+json",
 }
@@ -335,32 +341,30 @@ def detailed_pr_info(pad: curses.window, pr_info: PrInfo) -> None:
             webbrowser.open(pr_info.url)
 
 
-def apply_filter(
-    sorted_pr_infos: List[PrInfo], filter_regex: str, apply_to: str
-) -> List[PrInfo]:
-    pr_filter = re.compile(filter_regex.lower())
+def apply_filter(sorted_pr_infos: List[PrInfo], pr_filter: Filter) -> List[PrInfo]:
+    reg = re.compile(pr_filter.regex.lower())
     out = []
     for pr_info in sorted_pr_infos:
         to_search = []
-        if apply_to == "p":
+        if pr_filter.apply == "p":
             to_search.append(str(pr_info.number))
-        elif apply_to == "t":
+        elif pr_filter.apply == "t":
             to_search.append(pr_info.title)
-        elif apply_to == "o":
+        elif pr_filter.apply == "o":
             to_search.append(pr_info.author)
-        elif apply_to == "l":
+        elif pr_filter.apply == "l":
             to_search.extend(pr_info.labels)
-        elif apply_to == "a":
+        elif pr_filter.apply == "a":
             to_search.extend(pr_info.acks["ACKs"].keys())
-        elif apply_to == "s":
+        elif pr_filter.apply == "s":
             to_search.extend(pr_info.acks["Stale ACKs"].keys())
-        elif apply_to == "n":
+        elif pr_filter.apply == "n":
             to_search.extend(pr_info.acks["NACKs"].keys())
-        elif apply_to == "c":
+        elif pr_filter.apply == "c":
             to_search.extend(pr_info.acks["Concept ACKs"].keys())
 
         for s in to_search:
-            match = pr_filter.search(s.lower())
+            match = reg.search(s.lower())
             if match:
                 out.append(pr_info)
                 break
@@ -372,6 +376,7 @@ def main(stdscr: curses.window) -> None:
 
     pr_infos = get_pr_infos(stdscr)
     sort_key = "ACKs"
+    pr_filter = Filter()
     sorted_pr_infos = sorted(
         pr_infos, key=functools.partial(ack_key_func, sort_key), reverse=True
     )
@@ -542,14 +547,15 @@ def main(stdscr: curses.window) -> None:
                     reverse=True,
                 )
             elif cmd.startswith("f") and len(cmd) > 3 and cmd[2] == "/":
-                apply_to = cmd[1]
-                filter_regex = cmd.split("/")[1]
-                sorted_pr_infos = apply_filter(sorted_pr_infos, filter_regex, apply_to)
+                pr_filter.apply = cmd[1]
+                pr_filter.regex = cmd.split("/")[1]
+                sorted_pr_infos = apply_filter(sorted_pr_infos, pr_filter)
                 cursor_pos = 1
                 show_top = 0
                 stdscr.move(1, 0)
                 stdscr.clrtobot()
             elif cmd == "c":
+                pr_filter = Filter()
                 sorted_pr_infos = sorted(
                     pr_infos,
                     key=functools.partial(ack_key_func, sort_key),
