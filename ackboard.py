@@ -33,8 +33,20 @@ class PrInfo:
 
 @dataclass
 class Filter:
-    regex: str = ""
-    apply: str = ""
+    regex: str = ".*"
+    apply: str = "p"
+    regular: bool = True
+    draft: bool = True
+    needs_rebase: bool = True
+
+    def clear_text_filter(self):
+        self.regex = ".*"
+        self.apply = "p"
+
+    def clear_type_filter(self):
+        self.regular = True
+        self.draft = True
+        self.needs_rebase = True
 
 
 headers = {
@@ -345,6 +357,13 @@ def apply_filter(sorted_pr_infos: List[PrInfo], pr_filter: Filter) -> List[PrInf
     reg = re.compile(pr_filter.regex.lower())
     out = []
     for pr_info in sorted_pr_infos:
+        if not pr_filter.draft and pr_info.draft:
+            continue
+        elif not pr_filter.needs_rebase and pr_info.needs_rebase:
+            continue
+        elif not pr_filter.regular:
+            continue
+
         to_search = []
         if pr_filter.apply == "p":
             to_search.append(str(pr_info.number))
@@ -554,14 +573,42 @@ def main(stdscr: curses.window) -> None:
                 show_top = 0
                 stdscr.move(1, 0)
                 stdscr.clrtobot()
-            elif cmd == "c":
-                pr_filter = Filter()
+            elif cmd[0] == "c":
+                if len(cmd) == 1:
+                    pr_filter = Filter()
+                elif cmd == "cf":
+                    pr_filter.clear_text_filter()
+                elif cmd == "chd":
+                    pr_filter.draft = True
+                elif cmd == "chr":
+                    pr_filter.needs_rebase = True
+                elif cmd == "ch":
+                    pr_filter.clear_type_filter()
+                else:
+                    continue
+
                 sorted_pr_infos = sorted(
                     pr_infos,
                     key=functools.partial(ack_key_func, sort_key),
                     reverse=True,
                 )
+                sorted_pr_infos = apply_filter(sorted_pr_infos, pr_filter)
+
                 cursor_pos = 1
+                stdscr.move(1, 0)
+                stdscr.clrtobot()
+            elif cmd[0] == "h":
+                if cmd == "hd":
+                    pr_filter.draft = False
+                elif cmd == "hr":
+                    pr_filter.needs_rebase = False
+                else:
+                    continue
+
+                sorted_pr_infos = apply_filter(sorted_pr_infos, pr_filter)
+
+                cursor_pos = 1
+                show_top = 0
                 stdscr.move(1, 0)
                 stdscr.clrtobot()
 

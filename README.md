@@ -42,7 +42,13 @@ options:
 | `:sn` | Sort by number of NACKs |
 | `:sc` | Sort by number of Concept ACKs |
 | `:f` | Apply a filter. See Filters for more info |
-| `:c` | Clear filters |
+| `:c` | Clear filters and hiding |
+| `:cf` | Clear filters |
+| `:ch` | Clear hidden |
+| `:chd` | Clear hidden drafts |
+| `:chr` | Clear hidden needs rebase |
+| `:hd` | Hide drafts |
+| `:hr` | Hide needs rebase |
 | `o` | Open PR in browser |
 
 #### Filters
