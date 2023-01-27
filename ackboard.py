@@ -541,6 +541,7 @@ def main(stdscr: curses.window) -> None:
                     key=functools.partial(ack_key_func, sort_key),
                     reverse=True,
                 )
+                sorted_pr_infos = apply_filter(sorted_pr_infos, pr_filter)
             elif cmd == "sa":
                 sort_key = "ACKs"
                 sorted_pr_infos.sort(
