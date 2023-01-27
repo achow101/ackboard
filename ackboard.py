@@ -39,11 +39,11 @@ class Filter:
     draft: bool = True
     needs_rebase: bool = True
 
-    def clear_text_filter(self):
+    def clear_text_filter(self) -> None:
         self.regex = ".*"
         self.apply = "p"
 
-    def clear_type_filter(self):
+    def clear_type_filter(self) -> None:
         self.regular = True
         self.draft = True
         self.needs_rebase = True
