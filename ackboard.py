@@ -486,7 +486,7 @@ def main(stdscr: curses.window) -> None:
                 attrs,
             )
 
-        stdscr.move(cursor_pos, 0)
+        stdscr.move(lines - 1, 0)
         stdscr.refresh()
 
         key = stdscr.getch()
@@ -572,8 +572,7 @@ def main(stdscr: curses.window) -> None:
                 sorted_pr_infos = apply_filter(sorted_pr_infos, pr_filter)
                 cursor_pos = 1
                 show_top = 0
-                stdscr.move(1, 0)
-                stdscr.clrtobot()
+                stdscr.clear()
             elif cmd[0] == "c":
                 if len(cmd) == 1:
                     pr_filter = Filter()
@@ -596,8 +595,7 @@ def main(stdscr: curses.window) -> None:
                 sorted_pr_infos = apply_filter(sorted_pr_infos, pr_filter)
 
                 cursor_pos = 1
-                stdscr.move(1, 0)
-                stdscr.clrtobot()
+                stdscr.clear()
             elif cmd[0] == "h":
                 if cmd == "hd":
                     pr_filter.draft = False
@@ -610,8 +608,7 @@ def main(stdscr: curses.window) -> None:
 
                 cursor_pos = 1
                 show_top = 0
-                stdscr.move(1, 0)
-                stdscr.clrtobot()
+                stdscr.clear()
 
 
 if __name__ == "__main__":
