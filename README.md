@@ -41,6 +41,7 @@ options:
 | `:ss` | Sort by number of Stale ACKs |
 | `:sn` | Sort by number of NACKs |
 | `:sc` | Sort by number of Concept ACKs |
+| `:sr` | Shuffle the list |
 | `:f` | Apply a filter. See Filters for more info |
 | `:c` | Clear filters and hiding |
 | `:cf` | Clear filters |

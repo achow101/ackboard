@@ -3,6 +3,7 @@
 import argparse
 import curses
 import functools
+import random
 import re
 import requests
 import time
@@ -566,6 +567,8 @@ def main(stdscr: curses.window) -> None:
                     key=functools.partial(ack_key_func, sort_key),
                     reverse=True,
                 )
+            elif cmd == "sr":
+                random.shuffle(sorted_pr_infos)
             elif cmd.startswith("f") and len(cmd) > 3 and cmd[2] == "/":
                 pr_filter.apply = cmd[1]
                 pr_filter.regex = cmd.split("/")[1]
