@@ -25,6 +25,7 @@ class PrInfo:
     number: int
     title: str
     labels: List[str]
+    assignees: List[str]
     author: str
     acks: Acks
     draft: bool
@@ -72,6 +73,11 @@ query($prs_cursor: String, $repo_owner: String!, $repo_name: String!) {
         url
         author {
             login
+        }
+        assignees(first: 10, after: "") {
+          nodes {
+            login
+          }
         }
         timelineItems(first: 100, itemTypes: [ISSUE_COMMENT, PULL_REQUEST_REVIEW]) {
           nodes {
@@ -250,11 +256,13 @@ def get_pr_infos(stdscr: curses.window) -> List[PrInfo]:
                 ]["timelineItems"]["pageInfo"]
 
             labels = [n["name"] for n in pr["labels"]["nodes"]]
+            assignees = [n["login"] for n in pr["assignees"]["nodes"]]
             pr_infos.append(
                 PrInfo(
                     number=number,
                     title=pr["title"],
                     labels=labels,
+                    assignees=assignees,
                     author=author,
                     acks=acks,
                     draft=pr["isDraft"],
@@ -309,6 +317,7 @@ def detailed_pr_info(pad: curses.window, pr_info: PrInfo) -> None:
     text_lines.append(f"Title: {pr_info.title}")
     text_lines.append(f"Author: {pr_info.author}")
     text_lines.append(f"Labels: {', '.join(pr_info.labels)}")
+    text_lines.append(f"Assignees: {', '.join(pr_info.assignees)}")
 
     for ack_type, acks in pr_info.acks.items():
         text_lines.append(f"{ack_type}: {len(acks)}")
@@ -414,9 +423,10 @@ def main(stdscr: curses.window) -> None:
         pr_num_cols = 10
         title_cols = int(cols * 0.2)
         labels_cols = int(cols * 0.1)
+        assignees_cols = int(cols * 0.05)
         author_cols = int(cols * 0.05)
 
-        all_acks_cols = cols - pr_num_cols - title_cols - labels_cols - author_cols
+        all_acks_cols = cols - pr_num_cols - title_cols - labels_cols - author_cols - assignees_cols
         acks_cols = int(all_acks_cols * 0.3)
         stale_acks_cols = int(all_acks_cols * 0.3)
         nacks_cols = int(all_acks_cols * 0.2)
@@ -426,6 +436,7 @@ def main(stdscr: curses.window) -> None:
         title_header = str_to_width("Title", title_cols)
         author_header = str_to_width("Author", author_cols)
         labels_header = str_to_width("Labels", labels_cols)
+        assignees_header = str_to_width("Assignees", assignees_cols)
         acks_header = str_to_width("ACKs", acks_cols)
         nacks_header = str_to_width("NACKs", nacks_cols)
         stale_header = str_to_width("Stale Acks", stale_acks_cols)
@@ -434,7 +445,7 @@ def main(stdscr: curses.window) -> None:
         stdscr.addstr(
             0,
             0,
-            f"{pr_num_header}{title_header}{author_header}{labels_header}{acks_header}{nacks_header}{stale_header}{concept_header}",
+            f"{pr_num_header}{title_header}{author_header}{assignees_header}{labels_header}{acks_header}{nacks_header}{stale_header}{concept_header}",
             curses.A_BOLD,
         )
 
@@ -459,6 +470,7 @@ def main(stdscr: curses.window) -> None:
             title_str = str_to_width(pr_info.title, title_cols)
             author_str = str_to_width(pr_info.author, author_cols)
             labels_str = str_to_width(", ".join(pr_info.labels), labels_cols)
+            assignees_str = str_to_width(", ".join(pr_info.assignees), assignees_cols)
             acks_str = str_to_width(
                 f"({len(pr_info.acks['ACKs'])}) "
                 + ", ".join(pr_info.acks["ACKs"].keys()),
@@ -483,7 +495,7 @@ def main(stdscr: curses.window) -> None:
             stdscr.addstr(
                 line_pos,
                 0,
-                f"{pr_num_str}{title_str}{author_str}{labels_str}{acks_str}{nacks_str}{stale_str}{concept_str}",
+                f"{pr_num_str}{title_str}{author_str}{assignees_str}{labels_str}{acks_str}{nacks_str}{stale_str}{concept_str}",
                 attrs,
             )
 
