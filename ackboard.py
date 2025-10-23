@@ -64,7 +64,7 @@ repo_vars = {
 prs_query = """
 query($prs_cursor: String, $repo_owner: String!, $repo_name: String!) {
   repository(name: $repo_name, owner: $repo_owner) {
-    pullRequests(states: [OPEN], first: 100, after: $prs_cursor) {
+    pullRequests(states: [OPEN], first: 50, after: $prs_cursor) {
       nodes {
         number
         isDraft
@@ -79,7 +79,7 @@ query($prs_cursor: String, $repo_owner: String!, $repo_name: String!) {
             login
           }
         }
-        timelineItems(first: 100, itemTypes: [ISSUE_COMMENT, PULL_REQUEST_REVIEW]) {
+        timelineItems(first: 50, itemTypes: [ISSUE_COMMENT, PULL_REQUEST_REVIEW]) {
           nodes {
             ... on IssueComment{
               author {
@@ -122,7 +122,7 @@ comments_query = """
     query($comments_cursor: String, $pr_num: Int!, $repo_owner: String!, $repo_name: String!) {
       repository(name: $repo_name, owner: $repo_owner) {
         pullRequest(number: $pr_num) {
-          timelineItems(first: 100, after: $comments_cursor, itemTypes: [ISSUE_COMMENT, PULL_REQUEST_REVIEW]) {
+          timelineItems(first: 50, after: $comments_cursor, itemTypes: [ISSUE_COMMENT, PULL_REQUEST_REVIEW]) {
             nodes {
               ... on IssueComment{
                 author {
