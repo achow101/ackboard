@@ -31,6 +31,7 @@ class PrInfo:
     draft: bool
     needs_rebase: bool
     url: str
+    rfm: bool
 
 
 @dataclass
@@ -40,6 +41,7 @@ class Filter:
     regular: bool = True
     draft: bool = True
     needs_rebase: bool = True
+    rfm: bool = False
 
     def clear_text_filter(self) -> None:
         self.regex = ".*"
@@ -79,8 +81,13 @@ query($prs_cursor: String, $repo_owner: String!, $repo_name: String!) {
             login
           }
         }
-        timelineItems(first: 50, itemTypes: [ISSUE_COMMENT, PULL_REQUEST_REVIEW]) {
+        timelineItems(last: 50, itemTypes: [ISSUE_COMMENT, PULL_REQUEST_REVIEW]) {
           nodes {
+            ... on HeadRefForcePushedEvent {
+              author: actor {
+                login
+              }
+            }
             ... on IssueComment{
               author {
                 login
@@ -122,8 +129,13 @@ comments_query = """
     query($comments_cursor: String, $pr_num: Int!, $repo_owner: String!, $repo_name: String!) {
       repository(name: $repo_name, owner: $repo_owner) {
         pullRequest(number: $pr_num) {
-          timelineItems(first: 50, after: $comments_cursor, itemTypes: [ISSUE_COMMENT, PULL_REQUEST_REVIEW]) {
+          timelineItems(last: 50, after: $comments_cursor, itemTypes: [ISSUE_COMMENT, PULL_REQUEST_REVIEW]) {
             nodes {
+              ... on HeadRefForcePushedEvent {
+                author: actor {
+                  login
+                }
+              }
               ... on IssueComment{
                 author {
                   login
@@ -165,15 +177,28 @@ def extract_acks(user: str, text: str, acks: Acks, head_abbrev: str) -> None:
             if match:
                 groups = match.groups()
 
-                # Remove any previous acks from this user
+                # Since we are processing in reverse, do not modify if the user has already left an ACK
                 for _, existing_acks in acks.items():
-                    existing_acks.pop(user, None)
+                    if user in existing_acks:
+                        return
 
                 if len(groups) > 1 and groups[1][0:6] != head_abbrev:
                     acks["Stale ACKs"][user] = line
                 else:
                     acks[ack_type][user] = line
                 return
+
+
+RFM_PATTERN = re.compile(r"\brfm\b")
+
+
+def detect_rfm(text: str) -> bool:
+    rfm = False
+    for line in text.splitlines():
+        if line.startswith(">") or line.startswith("~"):
+            continue
+        rfm |= bool(RFM_PATTERN.search(line.lower()))
+    return rfm
 
 
 def graphql_request(query: str, variables: Dict[str, str]) -> Any:
@@ -221,12 +246,19 @@ def get_pr_infos(stdscr: curses.window) -> List[PrInfo]:
             head_commit = pr["headRefOid"]
             head_abbrev = head_commit[0:6]
             author = pr["author"]["login"]
+            rfm = False
 
             # Process comments and reviews, paginating as needed
             comments = pr["timelineItems"]["nodes"]
             comments_page_info = pr["timelineItems"]["pageInfo"]
             while True:
-                for comment in comments:
+                for comment in reversed(comments):
+                    if "body" not in comment:
+                        if rfm is False:
+                            rfm = None
+                        continue
+                    if rfm is not None:
+                        rfm |= detect_rfm(comment["body"])
                     if (
                         comment["author"] is None
                         or comment["author"]["login"] == "DrahtBot"
@@ -237,11 +269,11 @@ def get_pr_infos(stdscr: curses.window) -> List[PrInfo]:
                         comment["author"]["login"], comment["body"], acks, head_abbrev
                     )
 
-                if not comments_page_info["hasNextPage"]:
+                if not comments_page_info["hasPreviousPage"]:
                     break
 
                 comments_query_vars = {
-                    "comments_cursor": comments_page_info["endCursor"],
+                    "comments_cursor": comments_page_info["startCursor"],
                     "pr_num": number,
                 }
                 comments_query_vars.update(repo_vars)
@@ -268,6 +300,7 @@ def get_pr_infos(stdscr: curses.window) -> List[PrInfo]:
                     draft=pr["isDraft"],
                     needs_rebase="Needs rebase" in labels,
                     url=pr["url"],
+                    rfm=rfm,
                 )
             )
 
@@ -373,6 +406,8 @@ def apply_filter(sorted_pr_infos: List[PrInfo], pr_filter: Filter) -> List[PrInf
             continue
         elif not pr_filter.regular:
             continue
+        elif pr_filter.rfm and not pr_info.rfm:
+            continue
 
         to_search = []
         if pr_filter.apply == "p":
@@ -423,10 +458,19 @@ def main(stdscr: curses.window) -> None:
         pr_num_cols = 10
         title_cols = int(cols * 0.2)
         labels_cols = int(cols * 0.1)
-        assignees_cols = int(cols * 0.05)
-        author_cols = int(cols * 0.05)
+        assignees_cols = int(cols * 0.04)
+        author_cols = int(cols * 0.04)
+        rfm_cols = int(cols * 0.03)
 
-        all_acks_cols = cols - pr_num_cols - title_cols - labels_cols - author_cols - assignees_cols
+        all_acks_cols = (
+            cols
+            - pr_num_cols
+            - title_cols
+            - labels_cols
+            - author_cols
+            - assignees_cols
+            - rfm_cols
+        )
         acks_cols = int(all_acks_cols * 0.3)
         stale_acks_cols = int(all_acks_cols * 0.3)
         nacks_cols = int(all_acks_cols * 0.2)
@@ -437,6 +481,7 @@ def main(stdscr: curses.window) -> None:
         author_header = str_to_width("Author", author_cols)
         labels_header = str_to_width("Labels", labels_cols)
         assignees_header = str_to_width("Assignees", assignees_cols)
+        rfm_header = str_to_width("RFM?", rfm_cols)
         acks_header = str_to_width("ACKs", acks_cols)
         nacks_header = str_to_width("NACKs", nacks_cols)
         stale_header = str_to_width("Stale Acks", stale_acks_cols)
@@ -445,7 +490,7 @@ def main(stdscr: curses.window) -> None:
         stdscr.addstr(
             0,
             0,
-            f"{pr_num_header}{title_header}{author_header}{assignees_header}{labels_header}{acks_header}{nacks_header}{stale_header}{concept_header}",
+            f"{pr_num_header}{title_header}{author_header}{assignees_header}{rfm_header}{labels_header}{acks_header}{nacks_header}{stale_header}{concept_header}",
             curses.A_BOLD,
         )
 
@@ -471,6 +516,7 @@ def main(stdscr: curses.window) -> None:
             author_str = str_to_width(pr_info.author, author_cols)
             labels_str = str_to_width(", ".join(pr_info.labels), labels_cols)
             assignees_str = str_to_width(", ".join(pr_info.assignees), assignees_cols)
+            rfm_str = str_to_width("X" if pr_info.rfm else "", rfm_cols)
             acks_str = str_to_width(
                 f"({len(pr_info.acks['ACKs'])}) "
                 + ", ".join(pr_info.acks["ACKs"].keys()),
@@ -495,7 +541,7 @@ def main(stdscr: curses.window) -> None:
             stdscr.addstr(
                 line_pos,
                 0,
-                f"{pr_num_str}{title_str}{author_str}{assignees_str}{labels_str}{acks_str}{nacks_str}{stale_str}{concept_str}",
+                f"{pr_num_str}{title_str}{author_str}{assignees_str}{rfm_str}{labels_str}{acks_str}{nacks_str}{stale_str}{concept_str}",
                 attrs,
             )
 
@@ -599,6 +645,8 @@ def main(stdscr: curses.window) -> None:
                     pr_filter.needs_rebase = True
                 elif cmd == "ch":
                     pr_filter.clear_type_filter()
+                elif cmd == "cm":
+                    pr_filter.rfm = False
                 else:
                     continue
 
@@ -621,6 +669,12 @@ def main(stdscr: curses.window) -> None:
 
                 sorted_pr_infos = apply_filter(sorted_pr_infos, pr_filter)
 
+                cursor_pos = 1
+                show_top = 0
+                stdscr.clear()
+            elif cmd[0] == "m":
+                pr_filter.rfm = True
+                sorted_pr_infos = apply_filter(sorted_pr_infos, pr_filter)
                 cursor_pos = 1
                 show_top = 0
                 stdscr.clear()
