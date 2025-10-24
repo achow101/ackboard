@@ -22,6 +22,7 @@ Acks = Dict[str, Dict[str, str]]
 
 @dataclass
 class PrInfo:
+    repo: str
     number: int
     title: str
     labels: List[str]
@@ -57,11 +58,7 @@ headers = {
     "accept": "application/vnd.github.v3+json",
 }
 
-repo_vars = {
-    "repo_name": "",
-    "repo_owner": "",
-}
-
+repos = []
 
 prs_query = """
 query($prs_cursor: String, $repo_owner: String!, $repo_name: String!) {
@@ -221,92 +218,104 @@ def graphql_request(query: str, variables: Dict[str, str]) -> Any:
 
 def get_pr_infos(stdscr: curses.window) -> List[PrInfo]:
     pr_infos: List[PrInfo] = []
-    pr_query_vars: Dict[str, str] = repo_vars.copy()
-    while True:
-        stdscr.clear()
-        stdscr.addstr(
-            f"Fetching PRs from GitHub, this may take a while... ({len(pr_infos)} PRs loaded)"
-        )
-        stdscr.refresh()
 
-        pr_query_res = graphql_request(prs_query, pr_query_vars)
-        pr_list = pr_query_res["data"]["repository"]["pullRequests"]["nodes"]
-        pr_page_info = pr_query_res["data"]["repository"]["pullRequests"]["pageInfo"]
-
-        for pr in pr_list:
-            acks: Dict[str, Dict[str, str]] = {
-                "ACKs": {},
-                "Stale ACKs": {},
-                "NACKs": {},
-                "Approach ACKs": {},
-                "Concept ACKs": {},
-                "Other ACKs": {},
-            }
-            number = pr["number"]
-            head_commit = pr["headRefOid"]
-            head_abbrev = head_commit[0:6]
-            author = pr["author"]["login"]
-            rfm = False
-
-            # Process comments and reviews, paginating as needed
-            comments = pr["timelineItems"]["nodes"]
-            comments_page_info = pr["timelineItems"]["pageInfo"]
-            while True:
-                for comment in reversed(comments):
-                    if "body" not in comment:
-                        if rfm is False:
-                            rfm = None
-                        continue
-                    if rfm is not None:
-                        rfm |= detect_rfm(comment["body"])
-                    if (
-                        comment["author"] is None
-                        or comment["author"]["login"] == "DrahtBot"
-                        or comment["author"]["login"] == author
-                    ):
-                        continue
-                    extract_acks(
-                        comment["author"]["login"], comment["body"], acks, head_abbrev
-                    )
-
-                if not comments_page_info["hasPreviousPage"]:
-                    break
-
-                comments_query_vars = {
-                    "comments_cursor": comments_page_info["startCursor"],
-                    "pr_num": number,
-                }
-                comments_query_vars.update(repo_vars)
-                comments_query_res = graphql_request(
-                    comments_query, comments_query_vars
-                )
-                comments = comments_query_res["data"]["repository"]["pullRequest"][
-                    "timelineItems"
-                ]["nodes"]
-                comments_page_info = comments_query_res["data"]["repository"][
-                    "pullRequest"
-                ]["timelineItems"]["pageInfo"]
-
-            labels = [n["name"] for n in pr["labels"]["nodes"]]
-            assignees = [n["login"] for n in pr["assignees"]["nodes"]]
-            pr_infos.append(
-                PrInfo(
-                    number=number,
-                    title=pr["title"],
-                    labels=labels,
-                    assignees=assignees,
-                    author=author,
-                    acks=acks,
-                    draft=pr["isDraft"],
-                    needs_rebase="Needs rebase" in labels,
-                    url=pr["url"],
-                    rfm=rfm,
-                )
+    for repo_owner, repo_name in repos:
+        pr_query_vars: Dict[str, str] = {
+            "repo_name": repo_name,
+            "repo_owner": repo_owner,
+        }
+        while True:
+            stdscr.clear()
+            stdscr.addstr(
+                f"Fetching PRs from GitHub, this may take a while... ({len(pr_infos)} PRs loaded)"
             )
+            stdscr.refresh()
 
-        pr_query_vars["prs_cursor"] = pr_page_info["endCursor"]
-        if not pr_page_info["hasNextPage"]:
-            break
+            pr_query_res = graphql_request(prs_query, pr_query_vars)
+            pr_list = pr_query_res["data"]["repository"]["pullRequests"]["nodes"]
+            pr_page_info = pr_query_res["data"]["repository"]["pullRequests"][
+                "pageInfo"
+            ]
+
+            for pr in pr_list:
+                acks: Dict[str, Dict[str, str]] = {
+                    "ACKs": {},
+                    "Stale ACKs": {},
+                    "NACKs": {},
+                    "Approach ACKs": {},
+                    "Concept ACKs": {},
+                    "Other ACKs": {},
+                }
+                number = pr["number"]
+                head_commit = pr["headRefOid"]
+                head_abbrev = head_commit[0:6]
+                author = pr["author"]["login"]
+                rfm = False
+
+                # Process comments and reviews, paginating as needed
+                comments = pr["timelineItems"]["nodes"]
+                comments_page_info = pr["timelineItems"]["pageInfo"]
+                while True:
+                    for comment in reversed(comments):
+                        if "body" not in comment:
+                            if rfm is False:
+                                rfm = None
+                            continue
+                        if rfm is not None:
+                            rfm |= detect_rfm(comment["body"])
+                        if (
+                            comment["author"] is None
+                            or comment["author"]["login"] == "DrahtBot"
+                            or comment["author"]["login"] == author
+                        ):
+                            continue
+                        extract_acks(
+                            comment["author"]["login"],
+                            comment["body"],
+                            acks,
+                            head_abbrev,
+                        )
+
+                    if not comments_page_info["hasPreviousPage"]:
+                        break
+
+                    comments_query_vars = {
+                        "comments_cursor": comments_page_info["startCursor"],
+                        "pr_num": number,
+                        "repo_name": repo_name,
+                        "repo_owner": repo_owner,
+                    }
+                    comments_query_res = graphql_request(
+                        comments_query, comments_query_vars
+                    )
+                    comments = comments_query_res["data"]["repository"]["pullRequest"][
+                        "timelineItems"
+                    ]["nodes"]
+                    comments_page_info = comments_query_res["data"]["repository"][
+                        "pullRequest"
+                    ]["timelineItems"]["pageInfo"]
+
+                labels = [n["name"] for n in pr["labels"]["nodes"]]
+                assignees = [n["login"] for n in pr["assignees"]["nodes"]]
+                pr_infos.append(
+                    PrInfo(
+                        repo=f"{repo_owner}/{repo_name}",
+                        number=number,
+                        title=pr["title"],
+                        labels=labels,
+                        assignees=assignees,
+                        author=author,
+                        acks=acks,
+                        draft=pr["isDraft"],
+                        needs_rebase="Needs rebase" in labels,
+                        url=pr["url"],
+                        rfm=rfm,
+                    )
+                )
+
+            pr_query_vars["prs_cursor"] = pr_page_info["endCursor"]
+            if not pr_page_info["hasNextPage"]:
+                break
     return pr_infos
 
 
@@ -328,11 +337,20 @@ def ack_key_func(primary_sort_key: str, info: PrInfo) -> Tuple[int, int, int, in
     )
 
 
-def str_to_width(item: str, width: int, padding: int = 4, ellipsis: str = "…") -> str:
+def str_to_width(
+    item: str,
+    width: int,
+    padding: int = 3,
+    ellipsis: str = "…",
+    elide_middle: bool = False,
+) -> str:
     actual_width = width - padding - len(ellipsis)
     item_str = f"{item:<{actual_width}}"
     if len(item_str) > actual_width:
-        item_str = f"{item_str[:actual_width]}{ellipsis}"
+        if elide_middle:
+            item_str = f"{item_str[:3]}{ellipsis}{item_str[-(actual_width-3):]}"
+        else:
+            item_str = f"{item_str[:actual_width]}{ellipsis}"
     return f"{item_str:{width}}"
 
 
@@ -511,7 +529,9 @@ def main(stdscr: curses.window) -> None:
             elif pr_info.needs_rebase:
                 attrs |= curses.color_pair(2)
 
-            pr_num_str = str_to_width(str(pr_info.number), pr_num_cols)
+            pr_num_str = str_to_width(
+                f"{pr_info.repo}#{pr_info.number}", pr_num_cols, elide_middle=True
+            )
             title_str = str_to_width(pr_info.title, title_cols)
             author_str = str_to_width(pr_info.author, author_cols)
             labels_str = str_to_width(", ".join(pr_info.labels), labels_cols)
@@ -685,12 +705,20 @@ if __name__ == "__main__":
     parser.add_argument(
         "token_file", help="Path to the file containing the GitHub token"
     )
-    parser.add_argument("repo_owner", help="Repository owner")
-    parser.add_argument("repo_name", help="Repository name")
+    parser.add_argument(
+        "repos",
+        nargs="+",
+        help="Repositories to get PRs for specified as <owner>/<name>",
+    )
     args = parser.parse_args()
 
-    repo_vars["repo_owner"] = args.repo_owner
-    repo_vars["repo_name"] = args.repo_name
+    if "/" not in args.repos[0]:
+        raise Exception(
+            "The command line for ackboard has changed!! Repositories are now specified as single arguments of <owner>/<name>, and multiple repos can be specified. Please check --help for more information"
+        )
+
+    for repo in args.repos:
+        repos.append(repo.split("/", maxsplit=1))
 
     with open(args.token_file, "r") as f:
         line = f.readline().strip()
