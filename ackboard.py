@@ -511,6 +511,20 @@ def main(stdscr: curses.window) -> None:
         nacks_cols = int(cols * 0.1)
         concept_acks_cols = int(cols * 0.1)
 
+        allocated_cols = (
+            pr_num_cols
+            + title_cols
+            + author_cols
+            + assignees_cols
+            + rfm_cols
+            + labels_cols
+            + acks_cols
+            + stale_acks_cols
+            + nacks_cols
+            + concept_acks_cols
+        )
+        concept_acks_cols += cols - allocated_cols
+
         pr_num_header = str_to_width("PR", pr_num_cols)
         title_header = str_to_width("Title", title_cols)
         author_header = str_to_width("Author", author_cols)
