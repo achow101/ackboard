@@ -50,6 +50,7 @@ options:
 | `:chr` | Clear hidden needs rebase |
 | `:hd` | Hide drafts |
 | `:hr` | Hide needs rebase |
+| `:m` | Show only PRs flagged as possibly RFM |
 | `o` | Open PR in browser |
 
 #### Filters
