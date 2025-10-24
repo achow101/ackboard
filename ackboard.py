@@ -15,6 +15,7 @@ from typing import (
     Any,
     Dict,
     List,
+    Optional,
     Tuple,
 )
 
@@ -33,7 +34,7 @@ class PrInfo:
     draft: bool
     needs_rebase: bool
     url: str
-    rfm: bool
+    rfm: Optional[bool]
 
 
 @dataclass
@@ -252,7 +253,7 @@ def get_pr_infos(stdscr: curses.window) -> List[PrInfo]:
                 head_commit = pr["headRefOid"]
                 head_abbrev = head_commit[0:6]
                 author = pr["author"]["login"]
-                rfm = False
+                rfm: Optional[bool] = False
 
                 # Process comments and reviews, paginating as needed
                 comments = pr["timelineItems"]["nodes"]
