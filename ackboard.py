@@ -473,26 +473,16 @@ def main(stdscr: curses.window) -> None:
     curses.init_pair(2, curses.COLOR_CYAN, curses.COLOR_BLACK)
 
     while True:
-        pr_num_cols = 10
+        pr_num_cols = int(cols * 0.07)
         title_cols = int(cols * 0.2)
-        labels_cols = int(cols * 0.1)
-        assignees_cols = int(cols * 0.04)
-        author_cols = int(cols * 0.04)
+        author_cols = int(cols * 0.05)
+        assignees_cols = int(cols * 0.05)
         rfm_cols = int(cols * 0.03)
-
-        all_acks_cols = (
-            cols
-            - pr_num_cols
-            - title_cols
-            - labels_cols
-            - author_cols
-            - assignees_cols
-            - rfm_cols
-        )
-        acks_cols = int(all_acks_cols * 0.3)
-        stale_acks_cols = int(all_acks_cols * 0.3)
-        nacks_cols = int(all_acks_cols * 0.2)
-        concept_acks_cols = int(all_acks_cols * 0.2)
+        labels_cols = int(cols * 0.1)
+        acks_cols = int(cols * 0.15)
+        stale_acks_cols = int(cols * 0.15)
+        nacks_cols = int(cols * 0.1)
+        concept_acks_cols = int(cols * 0.1)
 
         pr_num_header = str_to_width("PR", pr_num_cols)
         title_header = str_to_width("Title", title_cols)
