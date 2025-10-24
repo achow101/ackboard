@@ -3,6 +3,7 @@
 import argparse
 import curses
 import functools
+import hashlib
 import random
 import re
 import requests
@@ -22,7 +23,7 @@ Acks = Dict[str, Dict[str, str]]
 
 @dataclass
 class PrInfo:
-    repo: str
+    repo: Tuple[str, str, int]
     number: int
     title: str
     labels: List[str]
@@ -219,7 +220,8 @@ def graphql_request(query: str, variables: Dict[str, str]) -> Any:
 def get_pr_infos(stdscr: curses.window) -> List[PrInfo]:
     pr_infos: List[PrInfo] = []
 
-    for repo_owner, repo_name in repos:
+    for repo in repos:
+        repo_owner, repo_name, _ = repo
         pr_query_vars: Dict[str, str] = {
             "repo_name": repo_name,
             "repo_owner": repo_owner,
@@ -299,7 +301,7 @@ def get_pr_infos(stdscr: curses.window) -> List[PrInfo]:
                 assignees = [n["login"] for n in pr["assignees"]["nodes"]]
                 pr_infos.append(
                     PrInfo(
-                        repo=f"{repo_owner}/{repo_name}",
+                        repo=repo,
                         number=number,
                         title=pr["title"],
                         labels=labels,
@@ -454,7 +456,33 @@ def apply_filter(sorted_pr_infos: List[PrInfo], pr_filter: Filter) -> List[PrInf
     return out
 
 
+def add_pr_str(
+    stdscr: curses.window,
+    line_pos: int,
+    pr_num_str: str,
+    repo_color: int,
+    info_str: str,
+    info_color: int,
+    standout: bool,
+) -> None:
+    attrs = 0
+    if standout:
+        attrs |= curses.A_STANDOUT
+    stdscr.addstr(line_pos, 0, pr_num_str, attrs | repo_color)
+    stdscr.addstr(line_pos, len(pr_num_str), info_str, attrs | info_color)
+
+
 def main(stdscr: curses.window) -> None:
+    for i, (repo_owner, repo_name) in enumerate(repos):
+        hashed_repo = int.from_bytes(
+            hashlib.sha256(f"{repo_owner}/{repo_name}".encode()).digest()[:4]
+        )
+        r = (hashed_repo & 0x3FF) % 1000
+        g = (hashed_repo & 0x1FFC00) % 1000
+        b = (hashed_repo & 0x7FF00000) % 1000
+        curses.init_color(i + 20, r, g, b)
+        curses.init_pair(i + 20, i + 20, curses.COLOR_BLACK)
+        repos[i] = (repo_owner, repo_name, i + 20)
 
     pr_infos = get_pr_infos(stdscr)
     sort_key = "ACKs"
@@ -511,16 +539,17 @@ def main(stdscr: curses.window) -> None:
 
             pr_info = sorted_pr_infos[pr_i]
 
-            attrs = 0
-            if line_pos == cursor_pos:
-                attrs |= curses.A_STANDOUT
+            standout = line_pos == cursor_pos
+            info_color = 0
             if pr_info.draft:
-                attrs |= curses.color_pair(1)
+                info_color |= curses.color_pair(1)
             elif pr_info.needs_rebase:
-                attrs |= curses.color_pair(2)
+                info_color |= curses.color_pair(2)
 
             pr_num_str = str_to_width(
-                f"{pr_info.repo}#{pr_info.number}", pr_num_cols, elide_middle=True
+                f"{pr_info.repo[0]}/{pr_info.repo[1]}#{pr_info.number}",
+                pr_num_cols,
+                elide_middle=True,
             )
             title_str = str_to_width(pr_info.title, title_cols)
             author_str = str_to_width(pr_info.author, author_cols)
@@ -548,11 +577,14 @@ def main(stdscr: curses.window) -> None:
                 concept_acks_cols,
             )
 
-            stdscr.addstr(
+            add_pr_str(
+                stdscr,
                 line_pos,
-                0,
-                f"{pr_num_str}{title_str}{author_str}{assignees_str}{rfm_str}{labels_str}{acks_str}{nacks_str}{stale_str}{concept_str}",
-                attrs,
+                pr_num_str,
+                curses.color_pair(pr_info.repo[2]),
+                f"{title_str}{author_str}{assignees_str}{rfm_str}{labels_str}{acks_str}{nacks_str}{stale_str}{concept_str}",
+                info_color,
+                standout,
             )
 
         stdscr.move(lines - 1, 0)
