@@ -24,7 +24,7 @@ Acks = Dict[str, Dict[str, str]]
 
 @dataclass
 class PrInfo:
-    repo: Tuple[str, str, int]
+    repo: Tuple[str, int]
     number: int
     title: str
     labels: List[str]
@@ -60,7 +60,7 @@ headers = {
     "accept": "application/vnd.github.v3+json",
 }
 
-repos = []
+repos: List[Tuple[str, int]] = []
 
 prs_query = """
 query($prs_cursor: String, $repo_owner: String!, $repo_name: String!) {
@@ -222,7 +222,7 @@ def get_pr_infos(stdscr: curses.window) -> List[PrInfo]:
     pr_infos: List[PrInfo] = []
 
     for repo in repos:
-        repo_owner, repo_name, _ = repo
+        repo_owner, repo_name = repo[0].split("/", maxsplit=1)
         pr_query_vars: Dict[str, str] = {
             "repo_name": repo_name,
             "repo_owner": repo_owner,
@@ -474,16 +474,14 @@ def add_pr_str(
 
 
 def main(stdscr: curses.window) -> None:
-    for i, (repo_owner, repo_name) in enumerate(repos):
-        hashed_repo = int.from_bytes(
-            hashlib.sha256(f"{repo_owner}/{repo_name}".encode()).digest()[:4]
-        )
+    for i, (repo, _) in enumerate(repos):
+        hashed_repo = int.from_bytes(hashlib.sha256(repo.encode()).digest()[:4])
         r = (hashed_repo & 0x3FF) % 1000
         g = (hashed_repo & 0x1FFC00) % 1000
         b = (hashed_repo & 0x7FF00000) % 1000
         curses.init_color(i + 20, r, g, b)
         curses.init_pair(i + 20, i + 20, curses.COLOR_BLACK)
-        repos[i] = (repo_owner, repo_name, i + 20)
+        repos[i] = (repo, i + 20)
 
     pr_infos = get_pr_infos(stdscr)
     sort_key = "ACKs"
@@ -548,7 +546,7 @@ def main(stdscr: curses.window) -> None:
                 info_color |= curses.color_pair(2)
 
             pr_num_str = str_to_width(
-                f"{pr_info.repo[0]}/{pr_info.repo[1]}#{pr_info.number}",
+                f"{pr_info.repo[0]}#{pr_info.number}",
                 pr_num_cols,
                 elide_middle=True,
             )
@@ -582,7 +580,7 @@ def main(stdscr: curses.window) -> None:
                 stdscr,
                 line_pos,
                 pr_num_str,
-                curses.color_pair(pr_info.repo[2]),
+                curses.color_pair(pr_info.repo[1]),
                 f"{title_str}{author_str}{assignees_str}{rfm_str}{labels_str}{acks_str}{nacks_str}{stale_str}{concept_str}",
                 info_color,
                 standout,
@@ -741,7 +739,7 @@ if __name__ == "__main__":
         )
 
     for repo in args.repos:
-        repos.append(repo.split("/", maxsplit=1))
+        repos.append((repo, 0))
 
     with open(args.token_file, "r") as f:
         line = f.readline().strip()
