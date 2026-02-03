@@ -266,6 +266,9 @@ def get_pr_infos(stdscr: curses.window) -> List[PrInfo]:
                             continue
                         if rfm is not None:
                             rfm |= detect_rfm(comment["body"])
+                        if "<!--meta-tag:bot-skip-->" in comment["body"]:
+                            print("AAAA")
+                            continue
                         if (
                             comment["author"] is None
                             or comment["author"]["login"] == "DrahtBot"
