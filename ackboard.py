@@ -162,6 +162,7 @@ comments_query = """
 
 ACK_PATTERNS = [
     (re.compile(r"\b(NACK)\b"), "NACKs"),
+    (re.compile(r"((C|c)oncept ACK)\b"), "Concept ACKs"),
     (re.compile(r"(ACK)(?:.*?)([0-9a-f]{6,40})\b"), "ACKs"),
     (re.compile(r"(ACK)\b"), "Concept ACKs"),
 ]
